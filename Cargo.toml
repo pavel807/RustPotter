@@ -1,7 +1,7 @@
 [package]
 name = "rustpotter"
-version = "4.0.0"
-edition = "2021"
+version = "4.0.1"
+edition = "2024"
 license = "Apache-2.0"
 description = "An open source wakeword spotter forged in rust."
 authors = ["Miguel Álvarez Díez <miguelwork92@gmail.com>"]
