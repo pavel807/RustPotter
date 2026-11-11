@@ -108,6 +108,12 @@ impl EmbeddingReference {
         self.threshold = threshold;
     }
 
+    /// Сохранить эталон без привязки к детектору (перекалибровка порога).
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), EmbeddingError> {
+        let file = File::create(path).map_err(|e| EmbeddingError::Io(e.to_string()))?;
+        ciborium::into_writer(self, file).map_err(|e| EmbeddingError::Io(e.to_string()))
+    }
+
     /// Прочитать эталон с диска без энкодера: диагностика счётов.
     /// Привязка к энкодеру — в [`EmbeddingDetector::load_reference`].
     pub fn load_reference_only(
