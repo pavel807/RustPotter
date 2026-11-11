@@ -86,6 +86,16 @@ impl EmbeddingReference {
     pub fn version_current() -> u32 {
         1
     }
+
+    /// Прочитать эталон с диска без энкодера: диагностика счётов.
+    /// Привязка к энкодеру — в [`EmbeddingDetector::load_reference`].
+    pub fn load_reference_only(
+        path: &std::path::Path,
+    ) -> Result<EmbeddingReference, EmbeddingError> {
+        let file = File::open(path).map_err(|e| EmbeddingError::Io(e.to_string()))?;
+        ciborium::from_reader(BufReader::new(file))
+            .map_err(|e| EmbeddingError::Io(e.to_string()))
+    }
 }
 
 /// Итог срабатывания.
@@ -172,14 +182,6 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
     /// Загруженный эталон (после [`Self::load_reference`] или регистрации).
     pub fn reference(&self) -> Option<&EmbeddingReference> {
         self.reference.as_ref()
-    }
-
-    /// Прочитать эталон с диска без энкодера: диагностика счётов,
-    /// проверка версии формата. Привязка к энкодеру — в [`Self::load_reference`].
-    pub fn load_reference_only(path: &std::path::Path) -> Result<EmbeddingReference, EmbeddingError> {
-        let file = File::open(path).map_err(|e| EmbeddingError::Io(e.to_string()))?;
-        ciborium::from_reader(BufReader::new(file))
-            .map_err(|e| EmbeddingError::Io(e.to_string()))
     }
 
     /// Регистрация: 3–5 позитивных окон фразы (любой голос) + 5–10 негативов
