@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
+    RustpotterDetection, ScoreMode, WakewordRef,
     mfcc::{MfccComparator, MfccNormalizer},
     wakewords::WakewordDetector,
-    RustpotterDetection, ScoreMode, WakewordRef,
 };
 
 pub(crate) struct WakewordComparator {

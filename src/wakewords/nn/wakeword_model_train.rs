@@ -1,15 +1,15 @@
 use super::wakeword_nn::{
-    flat_features, get_tensors_data, init_model_impl, LargeModel, MediumModel, ModelImpl, TinyModel,
+    LargeModel, MediumModel, ModelImpl, TinyModel, flat_features, get_tensors_data, init_model_impl,
 };
 use crate::{
+    ModelType, WakewordModel,
     constants::NN_NONE_LABEL,
     mfcc::MfccWavFileExtractor,
-    wakewords::{nn::wakeword_nn::SmallModel, ModelWeights},
-    ModelType, WakewordModel,
+    wakewords::{ModelWeights, nn::wakeword_nn::SmallModel},
 };
-use candle_core::{DType, Device, Tensor, D};
+use candle_core::{D, DType, Device, Tensor};
 use candle_nn::Optimizer;
-use candle_nn::{loss, ops, VarMap};
+use candle_nn::{VarMap, loss, ops};
 use std::{
     collections::HashMap,
     fs,
@@ -313,7 +313,10 @@ fn get_mfccs_labeled(
             } else {
                 return Err(Error::new(
                     ErrorKind::Other,
-                    format!("Forbidden label '{}', it doesn't exists on the training data or in the model you are training from.", label),
+                    format!(
+                        "Forbidden label '{}', it doesn't exists on the training data or in the model you are training from.",
+                        label
+                    ),
                 ));
             }
         }

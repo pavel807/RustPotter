@@ -21,7 +21,8 @@ impl VadDetector {
             .iter()
             .filter(|i| !i.is_nan())
             .min_by(|a, b| a.total_cmp(b))
-            .unwrap().max(0.01);
+            .unwrap()
+            .max(0.01);
         let th = min * self.mode.get_value();
         let n_high_frames = self.window.iter().filter(|v| **v > th).count();
         if n_high_frames > 10 {

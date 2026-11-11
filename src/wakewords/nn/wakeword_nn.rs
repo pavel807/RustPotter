@@ -1,9 +1,9 @@
 use crate::{
+    ModelType, RustpotterDetection, ScoreMode, WakewordModel,
     constants::{MFCCS_EXTRACTOR_OUT_SHIFTS, NN_NONE_LABEL},
     mfcc::MfccNormalizer,
     wakewords::WakewordDetector,
     wakewords::{ModelWeights, TensorData},
-    ModelType, RustpotterDetection, ScoreMode, WakewordModel,
 };
 use candle_core::{DType, Device, Tensor, Var};
 use candle_nn::{Linear, Module, VarBuilder, VarMap};

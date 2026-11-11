@@ -3,12 +3,12 @@ use std::io::BufReader;
 use hound::{WavReader, WavSpec};
 
 use crate::{
+    AudioFmt, Endianness, Sample, SampleFormat,
     audio::{AudioEncoder, GainNormalizerFilter},
     constants::{
         DETECTOR_INTERNAL_SAMPLE_RATE, MFCCS_EXTRACTOR_FRAME_LENGTH_MS,
         MFCCS_EXTRACTOR_FRAME_SHIFT_MS, MFCCS_EXTRACTOR_PRE_EMPHASIS,
     },
-    AudioFmt, Endianness, Sample, SampleFormat,
 };
 
 use super::{MfccExtractor, MfccNormalizer};

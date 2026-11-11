@@ -1,4 +1,4 @@
-use super::{dtw::Dtw, MfccComparator};
+use super::{MfccComparator, dtw::Dtw};
 
 pub struct MfccAverager {}
 impl MfccAverager {

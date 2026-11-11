@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::{constants::DETECTOR_INTERNAL_SAMPLE_RATE, BandPassConfig};
+use crate::{BandPassConfig, constants::DETECTOR_INTERNAL_SAMPLE_RATE};
 
 pub struct BandPassFilter {
     // options

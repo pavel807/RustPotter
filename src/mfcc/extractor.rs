@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use rustfft::{num_complex::Complex32, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex32};
 
 pub struct MfccExtractor {
     num_coefficients: usize,

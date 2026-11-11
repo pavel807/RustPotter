@@ -150,9 +150,5 @@ fn infinity_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
     vec![vec![f32::INFINITY; cols]; rows]
 }
 fn abs_diff(a: usize, b: usize) -> usize {
-    if a > b {
-        a - b
-    } else {
-        b - a
-    }
+    if a > b { a - b } else { b - a }
 }

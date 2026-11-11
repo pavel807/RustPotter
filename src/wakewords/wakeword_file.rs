@@ -1,7 +1,7 @@
 use std::{fs::File, io::BufReader};
 
 use ciborium::{de, ser};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::ScoreMode;
 
@@ -12,7 +12,7 @@ pub trait WakewordSave: Serialize {
         let mut file = match File::create(path) {
             Ok(it) => it,
             Err(err) => {
-                return Err("Unable to open file ".to_owned() + path + ": " + &err.to_string())
+                return Err("Unable to open file ".to_owned() + path + ": " + &err.to_string());
             }
         };
         ser::into_writer(self, &mut file).map_err(|err| err.to_string())?;
@@ -29,7 +29,7 @@ pub trait WakewordLoad: DeserializeOwned + Sized {
         let file = match File::open(path) {
             Ok(it) => it,
             Err(err) => {
-                return Err("Unable to open file ".to_owned() + path + ": " + &err.to_string())
+                return Err("Unable to open file ".to_owned() + path + ": " + &err.to_string());
             }
         };
         let reader = BufReader::new(file);

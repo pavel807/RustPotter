@@ -1,8 +1,6 @@
-use rubato::{
-    audioadapter_buffers::direct::SequentialSliceOfVecs, Fft, FixedSync, Resampler,
-};
+use rubato::{Fft, FixedSync, Resampler, audioadapter_buffers::direct::SequentialSliceOfVecs};
 
-use crate::{config::AudioFmt, Endianness, Sample, SampleFormat};
+use crate::{Endianness, Sample, SampleFormat, config::AudioFmt};
 
 /// Encode and convert audio to the supported format.
 pub struct AudioEncoder {
@@ -55,18 +53,11 @@ impl AudioEncoder {
             let input_buffer = self.resampler_input_buffer.as_mut().unwrap();
             let output_buffer = self.resampler_out_buffer.as_mut().unwrap();
             input_buffer[0] = mono_buffer;
-            let input_adapter = SequentialSliceOfVecs::new(
-                input_buffer,
-                1,
-                resampler.input_frames_next(),
-            )
-            .unwrap();
-            let mut output_adapter = SequentialSliceOfVecs::new_mut(
-                output_buffer,
-                1,
-                resampler.output_frames_next(),
-            )
-            .unwrap();
+            let input_adapter =
+                SequentialSliceOfVecs::new(input_buffer, 1, resampler.input_frames_next()).unwrap();
+            let mut output_adapter =
+                SequentialSliceOfVecs::new_mut(output_buffer, 1, resampler.output_frames_next())
+                    .unwrap();
             resampler
                 .process_into_buffer(&input_adapter, &mut output_adapter, None)
                 .unwrap();
@@ -101,7 +92,10 @@ impl AudioEncoder {
             output_samples_per_frame,
             resampler_out_buffer: if resampler.is_some() {
                 Some(vec![
-                    vec![0.0_f32; resampler.as_ref().unwrap().output_frames_next()];
+                    vec![
+                        0.0_f32;
+                        resampler.as_ref().unwrap().output_frames_next()
+                    ];
                     1
                 ])
             } else {
@@ -109,7 +103,10 @@ impl AudioEncoder {
             },
             resampler_input_buffer: if resampler.is_some() {
                 Some(vec![
-                    vec![0.0_f32; resampler.as_ref().unwrap().input_frames_next()];
+                    vec![
+                        0.0_f32;
+                        resampler.as_ref().unwrap().input_frames_next()
+                    ];
                     1
                 ])
             } else {

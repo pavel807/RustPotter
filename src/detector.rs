@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
+    DetectorConfig, FiltersConfig, RustpotterConfig, Sample, ScoreMode, WakewordLoad,
+    WakewordModel, WakewordRef,
     audio::{AudioEncoder, BandPassFilter, GainNormalizerFilter},
     constants::{
         DETECTOR_INTERNAL_SAMPLE_RATE, MFCCS_EXTRACTOR_FRAME_LENGTH_MS,
@@ -8,8 +10,6 @@ use crate::{
     },
     mfcc::{MfccExtractor, VadDetector},
     wakewords::{WakewordDetector, WakewordFile, WakewordV2},
-    DetectorConfig, FiltersConfig, RustpotterConfig, Sample, ScoreMode, WakewordLoad,
-    WakewordModel, WakewordRef,
 };
 /// Rustpotter is an open source wakeword spotter forged in rust
 /// ```

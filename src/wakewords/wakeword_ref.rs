@@ -1,8 +1,8 @@
-use super::{comp::WakewordComparator, WakewordDetector, WakewordFile};
+use super::{WakewordDetector, WakewordFile, comp::WakewordComparator};
 use crate::{
+    ScoreMode, WakewordRefBuildFromBuffers, WakewordRefBuildFromFiles,
     mfcc::MfccComparator,
     wakewords::{WakewordLoad, WakewordSave},
-    ScoreMode, WakewordRefBuildFromBuffers, WakewordRefBuildFromFiles,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

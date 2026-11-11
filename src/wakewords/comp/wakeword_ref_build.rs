@@ -1,8 +1,8 @@
 use std::{cmp::Ordering, collections::HashMap, fs::File, io::BufReader, path::Path};
 
 use crate::{
-    mfcc::{MfccAverager, MfccWavFileExtractor},
     WakewordRef,
+    mfcc::{MfccAverager, MfccWavFileExtractor},
 };
 
 pub trait WakewordRefBuildFromBuffers {
@@ -60,7 +60,7 @@ pub trait WakewordRefBuildFromFiles {
                     return Err("Unable to open file ".to_owned()
                         + &sample_path
                         + ": "
-                        + &err.to_string())
+                        + &err.to_string());
                 }
             };
             let mut sample_rms_level = 0.;
