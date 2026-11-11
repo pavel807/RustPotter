@@ -330,13 +330,16 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
                 .fold(f32::NEG_INFINITY, f32::max)
                 - dot(e, &negative)
         };
-        let min_pos = pos.iter()
-            .zip(&pos_c)
-            .map(|(e, _)| score(e))
+        // Скор считаем на ЦЕНТРИРОВАННЫХ сэмплах — ровно тех векторах,
+        // с которыми детектор работает в бою (сырые против центрированных
+        // дают мусорный порог).
+        let min_pos = pos_c
+            .iter()
+            .map(|e| score(e))
             .fold(f32::INFINITY, f32::min);
-        let max_neg = neg.iter()
-            .zip(&neg_c)
-            .map(|(e, _)| score(e))
+        let max_neg = neg_c
+            .iter()
+            .map(|e| score(e))
             .fold(f32::NEG_INFINITY, f32::max);
         if max_neg >= min_pos {
             return Err(EmbeddingError::Enrollment(format!(
