@@ -72,6 +72,11 @@ pub struct EmbeddingReference {
     pub version: u32,
     pub positive: Vec<f32>,
     pub negative: Vec<f32>,
+    /// Порог, вычисленный при регистрации из фактического зазора:
+    /// max(счёт негативов) + 0.5·(min(счёт позитивов) − max(счёт негативов)).
+    /// Шкала счёта зависит от энкодера — хранить его в эталоне, а не в
+    /// настройках, чей порог относится к другой шкале (DTW).
+    pub threshold: f32,
     /// Число позитивных/негативных сэмплов при регистрации (диагностика).
     pub positives_count: usize,
     pub negatives_count: usize,
@@ -240,10 +245,29 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         }
         l2_normalize(&mut negative);
 
+        // Порог из фактического зазора на самих эталонных сэмплах: шкала
+        // счёта своя у каждого энкодера, поэтому число живёт в эталоне.
+        let score = |e: &[f32]| dot(e, &positive) - dot(e, &negative);
+        let min_pos = pos
+            .iter()
+            .map(|e| score(e))
+            .fold(f32::INFINITY, f32::min);
+        let max_neg = neg
+            .iter()
+            .map(|e| score(e))
+            .fold(f32::NEG_INFINITY, f32::max);
+        if max_neg >= min_pos {
+            return Err(EmbeddingError::Enrollment(format!(
+                "негативы неотделимы от позитивов (max негатив {max_neg:.4} >= min позитив {min_pos:.4}):                  запиши негативы из других слов"
+            )));
+        }
+        let threshold = max_neg + 0.5 * (min_pos - max_neg);
+
         let reference = EmbeddingReference {
             version: EmbeddingReference::version_current(),
             positive,
             negative,
+            threshold,
             positives_count: pos.len(),
             negatives_count: neg.len(),
         };
@@ -323,7 +347,10 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let smoothed = sorted[sorted.len() / 2];
 
-        if smoothed < self.config.threshold {
+        // Порог берётся из эталона (своя шкала у каждого энкодера);
+        // config.threshold — запасной вариант для эталонов старого формата.
+        let threshold = self.reference.as_ref().map(|r| r.threshold).unwrap_or(self.config.threshold);
+        if smoothed < threshold {
             return None;
         }
         // Cooldown: одно срабатывание на фразу, а не на каждое окно внутри неё.
