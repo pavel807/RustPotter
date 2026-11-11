@@ -155,6 +155,8 @@ pub struct EmbeddingDetector<E: FrameEmbedder> {
     last_embed: Option<Instant>,
     /// Последние счёты для медианного сглаживания.
     recent_scores: VecDeque<f32>,
+    /// Счёт последнего окна (даже без срабатывания) — диагностика порога.
+    last_raw_score: Option<f32>,
     last_detection: Option<Instant>,
     samples_per_window: usize,
     samples_per_hop: usize,
@@ -173,6 +175,7 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
             since_embed: 0,
             last_embed: None,
             recent_scores: VecDeque::new(),
+            last_raw_score: None,
             last_detection: None,
             samples_per_window,
             samples_per_hop,
@@ -347,6 +350,7 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
 
         let reference = self.reference.as_ref()?;
         let raw_score = dot(&embedding, &reference.positive) - dot(&embedding, &reference.negative);
+        self.last_raw_score = Some(raw_score);
 
         // Медиана последних N счётов: одиночный всплеск шума не срабатывает.
         self.recent_scores.push_back(raw_score);
@@ -374,6 +378,11 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
             score: smoothed,
             raw_score,
         })
+    }
+
+    /// Счёт последнего окна (даже если ниже порога) — тюнинг и диагностика.
+    pub fn last_raw_score(&self) -> Option<f32> {
+        self.last_raw_score
     }
 
     /// Сбросить потоковое состояние (после паузы/смены источника): буфер и
