@@ -1,5 +1,6 @@
 mod audio;
 mod config;
+pub mod embedding;
 mod constants;
 mod detector;
 mod mfcc;
@@ -14,6 +15,10 @@ pub use config::{
 #[cfg(feature = "audio")]
 pub use constants::{DETECTOR_INTERNAL_SAMPLE_RATE, MFCCS_EXTRACTOR_FRAME_LENGTH_MS};
 pub use detector::{Rustpotter, RustpotterDetection};
+pub use embedding::{
+    EmbeddingConfig, EmbeddingDetection, EmbeddingDetector, EmbeddingError, EmbeddingReference,
+    FrameEmbedder,
+};
 pub use wakewords::{
     ModelType, ModelWeights, TensorData, WakewordLoad, WakewordModel, WakewordModelTrain,
     WakewordModelTrainOptions, WakewordRef, WakewordRefBuildFromBuffers, WakewordRefBuildFromFiles,
