@@ -16,8 +16,8 @@ pub use config::{
 pub use constants::{DETECTOR_INTERNAL_SAMPLE_RATE, MFCCS_EXTRACTOR_FRAME_LENGTH_MS};
 pub use detector::{Rustpotter, RustpotterDetection};
 pub use embedding::{
-    EmbeddingConfig, EmbeddingDetection, EmbeddingDetector, EmbeddingError, EmbeddingReference,
-    FrameEmbedder, l2_normalize,
+    l2_normalize, EmbeddingConfig, EmbeddingDetection, EmbeddingDetector, EmbeddingDiag,
+    EmbeddingError, EmbeddingReference, FrameEmbedder, MIN_RESIDUAL_NORM,
 };
 pub use wakewords::{
     ModelType, ModelWeights, TensorData, WakewordLoad, WakewordModel, WakewordModelTrain,
