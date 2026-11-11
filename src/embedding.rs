@@ -102,6 +102,12 @@ impl EmbeddingReference {
         2
     }
 
+    /// Перекалибровать порог после загрузки (например, по hold-out голосам:
+    /// само-совпадение записей регистрации завышает min_pos и порог).
+    pub fn set_threshold(&mut self, threshold: f32) {
+        self.threshold = threshold;
+    }
+
     /// Прочитать эталон с диска без энкодера: диагностика счётов.
     /// Привязка к энкодеру — в [`EmbeddingDetector::load_reference`].
     pub fn load_reference_only(
