@@ -70,6 +70,11 @@ impl Default for EmbeddingConfig {
 pub struct EmbeddingReference {
     /// Версия формата (при смене энкодера меняется и версия).
     pub version: u32,
+    /// Эмбеддинги КАЖДОГО позитивного сэмпла: счёт берётся максимумом по
+    /// ним — фраза под другим тоном ложится на ближайший эталон, а не
+    /// размывается средним (центроид хранится отдельно для совместимости
+    /// и диагностики).
+    pub positives: Vec<Vec<f32>>,
     pub positive: Vec<f32>,
     pub negative: Vec<f32>,
     /// Порог, вычисленный при регистрации из фактического зазора:
@@ -260,7 +265,14 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
 
         // Порог из фактического зазора на самих эталонных сэмплах: шкала
         // счёта своя у каждого энкодера, поэтому число живёт в эталоне.
-        let score = |e: &[f32]| dot(e, &positive) - dot(e, &negative);
+        // Боевой счёт — максимум по позитивам, поэтому и порог считаем
+        // с той же семантикой (min по позитивам их max-счётов).
+        let score = |e: &[f32]| {
+            pos.iter()
+                .map(|p| dot(e, p))
+                .fold(f32::NEG_INFINITY, f32::max)
+                - dot(e, &negative)
+        };
         let min_pos = pos
             .iter()
             .map(|e| score(e))
@@ -278,6 +290,7 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
 
         let reference = EmbeddingReference {
             version: EmbeddingReference::version_current(),
+            positives: pos.clone(),
             positive,
             negative,
             threshold,
@@ -300,7 +313,7 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
     /// Загрузить эталон и привязать к текущему энкодеру (проверка размерности).
     pub fn load_reference(&mut self, path: &std::path::Path) -> Result<(), EmbeddingError> {
         let file = File::open(path).map_err(|e| EmbeddingError::Io(e.to_string()))?;
-        let reference: EmbeddingReference =
+        let mut reference: EmbeddingReference =
             ciborium::from_reader(BufReader::new(file)).map_err(|e| EmbeddingError::Io(e.to_string()))?;
         let expected = self.extractor.dims();
         if reference.positive.len() != expected {
@@ -308,6 +321,11 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
                 expected,
                 got: reference.positive.len(),
             });
+        }
+        // Эталон старого формата (без списка позитивов): переносим центроид
+        // в список, детектор работает, счёт чуть консервативнее.
+        if reference.positives.is_empty() {
+            reference.positives.push(reference.positive.clone());
         }
         self.reference = Some(reference);
         Ok(())
@@ -349,7 +367,12 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         l2_normalize(&mut embedding);
 
         let reference = self.reference.as_ref()?;
-        let raw_score = dot(&embedding, &reference.positive) - dot(&embedding, &reference.negative);
+        let best_positive = reference
+            .positives
+            .iter()
+            .map(|p| dot(&embedding, p))
+            .fold(f32::NEG_INFINITY, f32::max);
+        let raw_score = best_positive - dot(&embedding, &reference.negative);
         self.last_raw_score = Some(raw_score);
 
         // Медиана последних N счётов: одиночный всплеск шума не срабатывает.
@@ -583,6 +606,7 @@ mod tests {
             det2.process(chunk);
         }
         assert!(det2.reference().is_some());
+        assert_eq!(det2.reference().unwrap().positives.len(), 3);
     }
 
     #[test]
