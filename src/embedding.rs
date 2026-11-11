@@ -68,8 +68,18 @@ impl Default for EmbeddingConfig {
 /// Зарегистрированный эталон: центроиды в L2-нормализованном пространстве.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddingReference {
-    /// Версия формата (при смене энкодера меняется и версия).
+    /// Версия формата. 2 = центрированные эмбеддинги (mean вычтен).
+    /// Эталоны версии 1 несовместимы по шкале — загрузка отклоняется
+    /// с явной ошибкой, а не молча.
     pub version: u32,
+    /// Размерность энкодера, которым построен эталон: при загрузке
+    /// несовпадение — явная ошибка (иначе мусорные скоры без диагноза).
+    pub dims: usize,
+    /// Фоновое среднее направление речи: вычитается из каждого эмбеддинга
+    /// (enrollment и боевого окна) перед L2 и подсчётом сходства. Сырые
+    /// энкодерные эмбеддинги лежат в общем направлении на 93%+ — без
+    /// центрирования дискриминативный сигнал зажат в остатке.
+    pub mean: Vec<f32>,
     /// Эмбеддинги КАЖДОГО позитивного сэмпла: счёт берётся максимумом по
     /// ним — фраза под другим тоном ложится на ближайший эталон, а не
     /// размывается средним (центроид хранится отдельно для совместимости
@@ -89,7 +99,7 @@ pub struct EmbeddingReference {
 
 impl EmbeddingReference {
     pub fn version_current() -> u32 {
-        1
+        2
     }
 
     /// Прочитать эталон с диска без энкодера: диагностика счётов.
@@ -288,14 +298,65 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         }
         let threshold = max_neg + 0.5 * (min_pos - max_neg);
 
+        // Фоновое среднее — по негативам (похожие слова, шум, тишина):
+        // это направление «речи вообще». Вычитаем его из всех векторов,
+        // после чего одно слово разными голосами сходится к ~0.96,
+        // а разные слова расходятся к ~0.1.
+        let mut mean = vec![0_f32; expected];
+        for e in &neg {
+            for (acc, x) in mean.iter_mut().zip(e) {
+                *acc += x;
+            }
+        }
+        for x in mean.iter_mut() {
+            *x /= neg.len() as f32;
+        }
+        let center = |e: &[f32]| -> Vec<f32> {
+            let mut v: Vec<f32> = e.iter().zip(&mean).map(|(x, m)| x - m).collect();
+            l2_normalize(&mut v);
+            v
+        };
+        let pos_c: Vec<Vec<f32>> = pos.iter().map(|e| center(e)).collect();
+        let neg_c: Vec<Vec<f32>> = neg.iter().map(|e| center(e)).collect();
+        let positive = center(&positive);
+        let negative = center(&negative);
+
+        // Порог на центрированных векторах, семантика — max по позитивам.
+        let score = |e: &[f32]| {
+            pos_c.iter()
+                .map(|p| dot(e, p))
+                .fold(f32::NEG_INFINITY, f32::max)
+                - dot(e, &negative)
+        };
+        let min_pos = pos.iter()
+            .zip(&pos_c)
+            .map(|(e, _)| score(e))
+            .fold(f32::INFINITY, f32::min);
+        let max_neg = neg.iter()
+            .zip(&neg_c)
+            .map(|(e, _)| score(e))
+            .fold(f32::NEG_INFINITY, f32::max);
+        if max_neg >= min_pos {
+            return Err(EmbeddingError::Enrollment(format!(
+                "негативы неотделимы от позитивов (max негатив {max_neg:.4} >= min позитив {min_pos:.4}): \
+                 запиши негативы из других слов"
+            )));
+        }
+        // 75% вглубь зазора: у негативов запас до порога, у позитивов
+        // половина зазора в запасе. Ровно середина ловила негатив,
+        // попавший ровно на порог (симметричный кейс).
+        let threshold = max_neg + 0.75 * (min_pos - max_neg);
+
         let reference = EmbeddingReference {
             version: EmbeddingReference::version_current(),
-            positives: pos.clone(),
+            dims: expected,
+            mean,
+            positives: pos_c.clone(),
             positive,
             negative,
             threshold,
-            positives_count: pos.len(),
-            negatives_count: neg.len(),
+            positives_count: pos_c.len(),
+            negatives_count: neg_c.len(),
         };
         self.reference = Some(reference.clone());
         Ok(reference)
@@ -315,17 +376,20 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         let file = File::open(path).map_err(|e| EmbeddingError::Io(e.to_string()))?;
         let mut reference: EmbeddingReference =
             ciborium::from_reader(BufReader::new(file)).map_err(|e| EmbeddingError::Io(e.to_string()))?;
+        if reference.version != EmbeddingReference::version_current() {
+            return Err(EmbeddingError::Enrollment(format!(
+                "эталон версии {} несовместим с текущей ({}): пересобери эталон \
+                 (cargo run -p jarvis-core --example wake_enroll) или перезапиши обучение в приложении",
+                reference.version,
+                EmbeddingReference::version_current()
+            )));
+        }
         let expected = self.extractor.dims();
-        if reference.positive.len() != expected {
+        if reference.dims != expected || reference.positive.len() != expected {
             return Err(EmbeddingError::DimMismatch {
                 expected,
-                got: reference.positive.len(),
+                got: if reference.dims != expected { reference.dims } else { reference.positive.len() },
             });
-        }
-        // Эталон старого формата (без списка позитивов): переносим центроид
-        // в список, детектор работает, счёт чуть консервативнее.
-        if reference.positives.is_empty() {
-            reference.positives.push(reference.positive.clone());
         }
         self.reference = Some(reference);
         Ok(())
@@ -367,6 +431,13 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         l2_normalize(&mut embedding);
 
         let reference = self.reference.as_ref()?;
+        // Центрирование тем же фоновым средним, что и на регистрации:
+        // без него все эмбеддинги лежат в общем направлении речи на 93%+
+        // и дискриминативный сигнал зажат в остатке.
+        for (x, m) in embedding.iter_mut().zip(&reference.mean) {
+            *x -= m;
+        }
+        l2_normalize(&mut embedding);
         let best_positive = reference
             .positives
             .iter()
@@ -535,9 +606,19 @@ mod tests {
         let hit = feed_pos(&mut pos_det, &pos_a).expect("позитив должен сработать");
         assert!(hit.score > 0.2, "счёт позитива {}", hit.score);
         let mut neg_det = EmbeddingDetector::new(MockEmbedder::new(32), config());
-        neg_det.reference = Some(reference);
+        neg_det.reference = Some(reference.clone());
+        eprintln!("DEBUG threshold={:.4} mean_len={:.4} pos0_len={:.4} neg_len={:.4}",
+            reference.threshold,
+            reference.mean.iter().map(|x| x*x).sum::<f32>().sqrt(),
+            reference.positives[0].iter().map(|x| x*x).sum::<f32>().sqrt(),
+            reference.negative.iter().map(|x| x*x).sum::<f32>().sqrt(),
+        );
+        let neg_out = feed_pos(&mut neg_det, &neg_a);
+        if let Some(d) = &neg_out {
+            eprintln!("DEBUG негатив сработал: score {:.3} raw {:.3}", d.score, d.raw_score);
+        }
         assert!(
-            feed_pos(&mut neg_det, &neg_a).is_none(),
+            neg_out.is_none(),
             "негатив не должен срабатывать"
         );
     }
