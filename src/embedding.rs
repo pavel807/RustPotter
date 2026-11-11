@@ -134,6 +134,11 @@ pub struct EmbeddingReference {
     /// Порог, откалиброванный при регистрации (leave-one-out) или по
     /// hold-out записям (`calibrate_threshold_holdout`).
     pub threshold: f32,
+    /// Множитель негативного штрафа, ЗАМОРОЖЕННЫЙ при регистрации:
+    /// порог калиброван с этим весом — боевой счёт обязан использовать
+    /// тот же, иначе шкала разъедется. #[serde(default)] для совместимости.
+    #[serde(default = "default_negative_weight")]
+    pub weight: f32,
     /// Число позитивных/негативных сэмплов регистрации (диагностика).
     pub positives_count: usize,
     pub negatives_count: usize,
@@ -583,6 +588,7 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
             positive,
             negative,
             threshold,
+            weight: self.config.negative_weight,
             positives_count: pos_c.len(),
             negatives_count: neg_c.len(),
         };
@@ -831,7 +837,7 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
                 .iter()
                 .map(|n| dot(&embedding, n))
                 .fold(f32::NEG_INFINITY, f32::max);
-            best_p - self.config.negative_weight * best_n
+            best_p - reference.weight * best_n
         };
         self.last_raw_score = Some(raw_score);
         diag.raw_score = Some(raw_score);
