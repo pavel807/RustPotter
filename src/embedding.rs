@@ -1036,7 +1036,7 @@ mod tests {
         assert!(
             det.enroll(
                 &[window.clone(), window.clone(), window.clone()],
-                &[window.clone()]
+                std::slice::from_ref(&window)
             )
             .is_err()
         );
@@ -1449,7 +1449,7 @@ mod tests {
             )
             .unwrap();
             // Ровно одно полное окно слова: единственный счёт выше порога.
-            feed(&mut det, &tone(4, 1, samples), 8000).is_empty() == false
+            !feed(&mut det, &tone(4, 1, samples), 8000).is_empty()
         };
         assert!(!word_once(2), "min_hits=2: один пик не срабатывает");
         assert!(word_once(1), "min_hits=1: пик срабатывает");
