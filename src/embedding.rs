@@ -132,6 +132,8 @@ pub enum EmbeddingError {
     Enrollment(String),
 }
 
+impl std::error::Error for EmbeddingError {}
+
 impl std::fmt::Display for EmbeddingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
