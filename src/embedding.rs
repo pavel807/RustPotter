@@ -174,6 +174,14 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         self.reference.as_ref()
     }
 
+    /// Прочитать эталон с диска без энкодера: диагностика счётов,
+    /// проверка версии формата. Привязка к энкодеру — в [`Self::load_reference`].
+    pub fn load_reference_only(path: &std::path::Path) -> Result<EmbeddingReference, EmbeddingError> {
+        let file = File::open(path).map_err(|e| EmbeddingError::Io(e.to_string()))?;
+        ciborium::from_reader(BufReader::new(file))
+            .map_err(|e| EmbeddingError::Io(e.to_string()))
+    }
+
     /// Регистрация: 3–5 позитивных окон фразы (любой голос) + 5–10 негативов
     /// (тишина, шум, похожие слова). Каждый сэмпл — окно той же длины, что
     /// боевое (`window_ms`); эмбеддинги L2-нормализуются, центроиды — средние.
