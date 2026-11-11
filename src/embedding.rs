@@ -110,8 +110,9 @@ impl Default for EmbeddingConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddingReference {
     /// Версия формата. 3 = центрированные эмбеддинги + жёсткие негативы
-    /// + leave-one-out калибровка. Версии 1 и 2 отклоняются при загрузке
-    /// с советом пересобрать эталон.
+    /// + leave-one-out калибровка.
+    ///
+    /// Версии 1 и 2 отклоняются при загрузке с советом пересобрать эталон.
     pub version: u32,
     /// Размерность энкодера: несовпадение при загрузке — явная ошибка.
     pub dims: usize,
@@ -156,6 +157,7 @@ impl EmbeddingReference {
     }
 
     /// Прочитать эталон с диска без энкодера: диагностика счётов.
+    ///
     /// Привязка к энкодеру — в [`EmbeddingDetector::load_reference`].
     pub fn load_reference_only(
         path: &std::path::Path,
@@ -1027,7 +1029,10 @@ mod tests {
     fn enroll_validates_counts_and_window_size() {
         let mut det = EmbeddingDetector::new(MockEmbedder::new(16), config()).unwrap();
         let window = vec![0_f32; 16_000 / 2]; // 500 мс
-        assert!(det.enroll(std::slice::from_ref(&window), &[window.clone()]).is_err());
+        assert!(
+            det.enroll(std::slice::from_ref(&window), std::slice::from_ref(&window))
+                .is_err()
+        );
         assert!(
             det.enroll(
                 &[window.clone(), window.clone(), window.clone()],
@@ -1502,7 +1507,7 @@ mod tests {
         det.reset();
         assert!(det.last_raw_score().is_none());
         assert!(det.last_diag().is_none());
-        assert_eq!(det.extractor.embeds() > 0, true);
+        assert!(det.extractor.embeds() > 0);
         // После reset поток начинается с чистого листа: тишина — ничего.
         assert!(det.process(&vec![0_f32; samples]).is_none());
     }
