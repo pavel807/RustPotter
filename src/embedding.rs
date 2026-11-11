@@ -477,14 +477,19 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
         let raw_score = best_positive - dot(&embedding, &reference.negative);
         self.last_raw_score = Some(raw_score);
 
-        // Медиана последних N счётов: одиночный всплеск шума не срабатывает.
+        // ПИК последних N окон, а не медиана: фраза даёт 2–4 окна
+        // (начало/середина/конец), лучшее выравнивание — обычно последнее,
+        // полное. Медиана гасила лучшее окно и роняла детект до ~5/10.
+        // Ложный пик шума не страшен: негативы ≤ 0.34 против порога ~0.8.
         self.recent_scores.push_back(raw_score);
         while self.recent_scores.len() > self.config.smoothing.max(1) {
             self.recent_scores.pop_front();
         }
-        let mut sorted: Vec<f32> = self.recent_scores.iter().copied().collect();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let smoothed = sorted[sorted.len() / 2];
+        let smoothed = self
+            .recent_scores
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
 
         // Порог берётся из эталона (своя шкала у каждого энкодера);
         // config.threshold — запасной вариант для эталонов старого формата.
@@ -722,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn smoothing_median_rejects_single_spike() {
+    fn smoothing_peak_catches_best_window() {
         let config = EmbeddingConfig {
             smoothing: 3,
             ..config()
@@ -739,18 +744,14 @@ mod tests {
             ],
         )
         .unwrap();
-        // Одно окно с высоким счётом (первое после тишины) не должно
-        // сработать: медиана из одного значения, затем 2 неизвестных.
-        // Проверяем инвариант мягче: до трёх окон без звука подряд
-        // срабатывание возможно только если медиана держится у порога.
+        // Слово из 5 окон при сглаживании 3: хотя бы одно полное окно
+        // даёт пик — детектор обязан сработать (медиана здесь роняла).
         let mut fired = false;
         for chunk in word.chunks(1600) {
             if det.process(chunk).is_some() {
                 fired = true;
             }
         }
-        // Со сглаживанием 3 слово из 5 окон (500 мс при 100 мс hop) должно
-        // сработать — медиана успевает устояться.
-        assert!(fired, "устойчивое слово проходит медианное сглаживание");
+        assert!(fired, "полное окно фразы проходит пиковое сглаживание");
     }
 }
