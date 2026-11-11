@@ -361,6 +361,11 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
                 .min(min_pos - 0.05 * gap);
         }
 
+        // Диагностика калибровки — видна в логе сборки эталона.
+        println!(
+            "📊 Калибровка: позитивы min {min_pos:.3}, негативы max {max_neg:.3}, зазор {gap:.3}, порог {threshold:.3}"
+        );
+
         let reference = EmbeddingReference {
             version: EmbeddingReference::version_current(),
             dims: expected,
