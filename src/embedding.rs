@@ -652,7 +652,11 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
                 "hold-out: нужны хотя бы по одному позитиву и негативу".into(),
             ));
         }
-        let w = self.config.negative_weight;
+        // Вес негативов — из ЭТАЛОНА, а не из конфига детектора: бой считает
+        // по reference.weight, и калибровка обязана быть на той же шкале.
+        // Иначе у загруженного эталона (вес, скажем, 0.3) в детекторе с
+        // дефолтным конфигом (1.0) порог считался бы на другой шкале.
+        let w = reference.weight;
         let score = |e: &[f32]| -> f32 {
             let best_p = reference
                 .positives
@@ -715,6 +719,10 @@ impl<E: FrameEmbedder> EmbeddingDetector<E> {
             });
         }
         reference.set_threshold(reference.threshold);
+        // Шкала эталона становится шкалой детектора: конфиг не может
+        // остаться с другим negative_weight, иначе калибровка и бой
+        // считают в разных единицах.
+        self.config.negative_weight = reference.weight;
         self.reference = Some(reference);
         Ok(())
     }
@@ -1552,6 +1560,61 @@ mod tests {
         assert_eq!(cfg.hangover_ms, 1200);
         assert!((cfg.negative_weight - 1.0).abs() < 1e-6);
         let _ = EmbeddingDetector::new(MockEmbedder::new(16), cfg).unwrap();
+    }
+
+    #[test]
+    fn loaded_reference_keeps_negative_weight_scale() {
+        // Вес негативов заморожен в эталоне: после load_reference калибровка
+        // по hold-out обязана считать на той же шкале, что и бой. Раньше
+        // calibrate_threshold_holdout брал вес из конфига детектора, а бой —
+        // из эталона: при загрузке эталона с весом 0.3 в детектор с дефолтным
+        // конфигом (1.0) порог калибровался на другой шкале.
+        let dir = std::env::temp_dir().join("rustpotter-weight-scale-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let samples = 16_000 / 2;
+        let cfg_w = EmbeddingConfig {
+            negative_weight: 0.3,
+            ..config()
+        };
+        let mut det = EmbeddingDetector::new(MockEmbedder::new(8), cfg_w.clone()).unwrap();
+        det.enroll(
+            &[
+                tone(4, 1, samples),
+                tone(4, 2, samples),
+                tone(4, 3, samples),
+            ],
+            &[
+                tone(5, 4, samples),
+                tone(6, 5, samples),
+                tone(7, 6, samples),
+            ],
+        )
+        .unwrap();
+        let path = dir.join("ref.jref");
+        det.save_reference(&path).unwrap();
+
+        let holdout_pos = vec![tone(4, 11, samples), tone(4, 12, samples)];
+        let holdout_neg = vec![tone(6, 21, samples)];
+
+        // Эталон загружен в детектор с ДЕФОЛТНЫМ весом 1.0.
+        let mut loaded = EmbeddingDetector::new(MockEmbedder::new(8), config()).unwrap();
+        loaded.load_reference(&path).unwrap();
+        let t_loaded = loaded
+            .calibrate_threshold_holdout(&holdout_pos, &holdout_neg)
+            .expect("калибровка загруженного эталона");
+
+        // Тот же файл эталона, детектор сразу с правильным весом.
+        let mut direct = EmbeddingDetector::new(MockEmbedder::new(8), cfg_w).unwrap();
+        direct.load_reference(&path).unwrap();
+        let t_direct = direct
+            .calibrate_threshold_holdout(&holdout_pos, &holdout_neg)
+            .expect("калибровка эталона с тем же весом");
+
+        assert!(
+            (t_loaded - t_direct).abs() < 1e-6,
+            "порог после загрузки эталона {t_loaded} должен совпадать с порогом при том же весе {t_direct}"
+        );
     }
 
     #[test]
